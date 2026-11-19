@@ -1,0 +1,59 @@
+name: Update stats cards
+
+on:
+  schedule:
+    - cron: "0 3 * * *" # Daily at 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  # Pinned on purpose. This commit fixes the `UnexpectedToken` crash present in
+  # the latest release (v2.0.1), which has no newer binary published.
+  # https://github.com/jstrieb/github-stats/issues/153
+  GITHUB_STATS_REF: ef574fae2ce8311f3e1ebb43e07c0c0fae0a41b6
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Zig
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
+        with:
+          version: 0.16.0
+
+      - name: Build github-stats
+        run: |
+          git init -q /tmp/github-stats
+          git -C /tmp/github-stats remote add origin https://github.com/jstrieb/github-stats
+          git -C /tmp/github-stats fetch -q --depth=1 origin "${GITHUB_STATS_REF}"
+          git -C /tmp/github-stats checkout -q FETCH_HEAD
+          cd /tmp/github-stats
+          zig build
+          ./zig-out/bin/github-stats --version
+
+      - name: Generate stats cards
+        run: /tmp/github-stats/zig-out/bin/github-stats
+        env:
+          ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          OVERVIEW_OUTPUT_FILE: profile/overview.svg
+          LANGUAGES_OUTPUT_FILE: profile/languages.svg
+          # Don't count this repo's own bot commits in the lines-changed tally.
+          EXCLUDE_REPOS: badwatt/badwatt
+          # Flip to SILENT: "true" once the workflow is green.
+          SILENT: "false"
+          VERBOSE: "true"
+          MAX_RETRIES: "5"
+
+      - name: Commit cards
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add profile/overview.svg profile/languages.svg
+          git commit -m "Update stats cards" || exit 0
+          git push
