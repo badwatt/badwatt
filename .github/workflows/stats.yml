@@ -45,9 +45,8 @@ jobs:
           LANGUAGES_OUTPUT_FILE: profile/languages.svg
           # Don't count this repo's own bot commits in the lines-changed tally.
           EXCLUDE_REPOS: badwatt/badwatt
-          # Flip to SILENT: "true" once the workflow is green.
-          SILENT: "false"
-          VERBOSE: "true"
+          # Set VERBOSE: "true" (and SILENT: "false") to debug a failing run.
+          SILENT: "true"
           MAX_RETRIES: "5"
 
       - name: Commit cards
